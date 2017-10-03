@@ -53,7 +53,7 @@ def predict(model, X):
   y_pred = model.predict(X)
   print(y_pred)
   y_pred_decoded = decode_y2(y_pred,
-                            confidence_thresh=0.1,
+                            confidence_thresh=0.2,
                             iou_threshold=0.4,
                             top_k='all',
                             input_coords='centroids',
@@ -67,7 +67,7 @@ def predict(model, X):
 
 # 5: Draw the predicted boxes onto the image
 
-def predictAndDraw(model, X):
+def predictAndDraw(model, X, y_true):
   i = 0
   y_pred_decoded = predict(model, X)
   plt.figure(figsize=(20,12))
@@ -84,14 +84,15 @@ def predictAndDraw(model, X):
       current_axis.text(box[2], box[4], label, size='x-large', color='white', bbox={'facecolor':'blue', 'alpha':1.0})
 
   # Draw the ground truth boxes in green (omit the label for more clarity)
-  # for box in y_true[i]:
-  #     label = '{}'.format(classes[int(box[0])])
-  #     current_axis.add_patch(plt.Rectangle((box[1], box[3]), box[2]-box[1], box[4]-box[3], color='green', fill=False, linewidth=2))
-  #     #current_axi
+  for box in y_true[i]:
+      label = '{}'.format(classes[int(box[0])])
+      current_axis.add_patch(plt.Rectangle((box[1], box[3]), box[2]-box[1], box[4]-box[3], color='green', fill=False, linewidth=2))
+  plt.show()
+
 
 if __name__ == '__main__':
-  img_height = 300  # Height of the input images
-  img_width = 480  # Width of the input images
+  img_height = 360  # Height of the input images
+  img_width = 640  # Width of the input images
   img_channels = 3  # Number of color channels of the input images
   n_classes = 4  # Number of classes including the background class
   min_scale = 0.08  # The scaling factor for the smallest anchor boxes
@@ -123,7 +124,7 @@ if __name__ == '__main__':
                                        normalize_coords=normalize_coords)
   ### Set up training
 
-  batch_size = 32
+  batch_size = 16
 
   # 3: Instantiate an Adam optimizer and the SSD loss function and compile the model
 
@@ -159,7 +160,7 @@ if __name__ == '__main__':
                                  box_output_format=['class_id', 'xmin', 'xmax', 'ymin',
                                                     'ymax'])  # This is the format in which the generator is supposed to output the labels. At the moment it **must** be the format set here.
 
-  i,l = train_dataset.parse_bosch_yaml(yaml_file='./bosch/train.yaml', ret=True)
+  i,l = train_dataset.parse_bosch_yaml(yaml_file='./bosch/combined_train.yaml', ret=True)
 
   #  XML parser will be helpful, check the documentation.
 
@@ -235,11 +236,12 @@ if __name__ == '__main__':
 
   print(n_train_samples)
 
-  if Path('ssd7_bosch.h5').is_file():
+  if Path('ssd7_bosch_weights.h5').is_file():
     print('Using existing model!')
     # model = load_model('ssd7_bosch.h5')
-    model.load_weights('ssd7_0_weights_epoch16_loss0.0896.h5')
-    X, y_true, filenames = next(predict_generator)
-    predictAndDraw(model, X)
+    model.load_weights('ssd7_bosch_weights.h5')
+    while True:
+      X, y_true, filenames = next(predict_generator)
+      predictAndDraw(model, X, y_true)
   else:
-    train(30, 128, train_generator, n_train_samples, val_generator, n_val_samples)
+    train(30, batch_size, train_generator, n_train_samples, val_generator, n_val_samples)
