@@ -28,6 +28,8 @@ from PIL import Image
 import csv
 import os
 from bs4 import BeautifulSoup
+import yaml
+from pathlib import Path
 
 # Image processing functions used by the generator to perform the following image manipulations:
 # - Translation
@@ -175,6 +177,45 @@ class BatchGenerator:
         # `self.labels` is a list containing one 2D Numpy array per image. For an image with `k` ground truth bounding boxes,
         # the respective 2D array has `k` rows, each row containing `(xmin, xmax, ymin, ymax, class_id)` for the respective bounding box.
         self.labels = [] # Each entry here will contain a 2D Numpy array with all the ground truth boxes for a given image
+
+    def parse_bosch_yaml(self, yaml_file=None, ret=False, force_dir=None):
+      images = yaml.load(open(yaml_file, 'rb').read())
+      self.filenames = []
+      self.labels = []
+
+
+      for i in range(len(images)):
+        current_label = []
+        image_path = images[i]['path']
+
+        if (force_dir):
+          image = Path(image_path).name
+          image_path = force_dir + '/' + image
+
+        for boxes in images[i]['boxes']:
+          label = []
+          # mark state
+          state = 0
+          if (boxes['label'] == 'Red'):
+            state = 1
+          elif (boxes['label'] == 'Yellow'):
+            state = 2
+          elif (boxes['label'] == 'Green'):
+            state = 3
+
+          label.append(state)
+          label.append(int(boxes['x_min']))
+          label.append(int(boxes['x_max']))
+          label.append(int(boxes['y_min']))
+          label.append(int(boxes['y_max']))
+          current_label.append(label)
+        if (len(current_label) != 0):
+          self.filenames.append(image_path)
+          self.labels.append(np.stack(current_label, axis=0))
+
+      if ret:
+        return self.filenames, self.labels
+
 
     def parse_csv(self,
                   labels_path=None,
